@@ -5,7 +5,6 @@
              StartupUri="MainWindow.xaml">
     <Application.Resources>
         <conv:BoolToBrushConverter x:Key="BoolToBrushConverter"/>
-        <conv:HalfConverter x:Key="HalfConverter"/>
         <conv:VertexConverter x:Key="VertexConverter"/>
     </Application.Resources>
 </Application>

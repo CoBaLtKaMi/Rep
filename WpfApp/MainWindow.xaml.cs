@@ -8,6 +8,7 @@ using System.Windows.Input;
 using System.Windows.Media;
 using System.Windows.Shapes;
 using WpfApp.ViewModels;
+using GraphLibrary.Algorithms;
 
 namespace WpfApp.Views
 {
@@ -15,9 +16,11 @@ namespace WpfApp.Views
     {
         private MainViewModel _vm;
         private VertexViewModel _startVertex;
+        private VertexViewModel _endVertex;
         private Line _tempLine;
         private HashSet<(int, int)> _occupiedPositions;
-        private const double VertexSize = 40; // Увеличиваем зону чувствительности до 40x40
+        private const double VertexSize = 35; // Matches XAML hit-test area
+        private string _algorithmMode; // EdgeCreation, BFS, DFS, Dijkstra
 
         public MainWindow()
         {
@@ -26,7 +29,14 @@ namespace WpfApp.Views
             DataContext = _vm;
             _occupiedPositions = new HashSet<(int, int)>();
             Loaded += MainWindow_Loaded;
-            _vm.PropertyChanged += (s, e) => { if (e.PropertyName == nameof(_vm.GridStep) || e.PropertyName == nameof(_vm.GridWidth) || e.PropertyName == nameof(_vm.GridHeight)) GenerateGrid(); };
+            _vm.PropertyChanged += (s, e) =>
+            {
+                if (e.PropertyName == nameof(_vm.GridStep) ||
+                    e.PropertyName == nameof(_vm.GridWidth) ||
+                    e.PropertyName == nameof(_vm.GridHeight))
+                    GenerateGrid();
+            };
+            _algorithmMode = "EdgeCreation";
         }
 
         private void MainWindow_Loaded(object sender, RoutedEventArgs e)
@@ -111,6 +121,7 @@ namespace WpfApp.Views
             Canvas.SetZIndex(yAxis, 0);
             GraphCanvas.Children.Add(yAxis);
         }
+
         private void GraphCanvas_MouseLeftButtonDown(object sender, MouseButtonEventArgs e)
         {
             if (e.ClickCount == 1)
@@ -128,104 +139,128 @@ namespace WpfApp.Views
                 double x = position.X;
                 double y = position.Y;
 
-                // Проверяем, попал ли клик в область вершины (40x40)
                 VertexViewModel clickedVertex = null;
                 foreach (var vertex in _vm.Vertices)
                 {
                     double dx = Math.Abs(vertex.X - x);
                     double dy = Math.Abs(vertex.Y - y);
-                    if (dx <= VertexSize / 2 && dy <= VertexSize / 2) // Зона 40x40
+                    if (dx <= VertexSize / 2 && dy <= VertexSize / 2)
                     {
                         clickedVertex = vertex;
                         break;
                     }
                 }
 
-                if (clickedVertex != null)
+                if (_algorithmMode == "BFS" || _algorithmMode == "DFS" || _algorithmMode == "Dijkstra")
                 {
-                    // Клик по вершине
-                    if (_startVertex == null)
+                    if (clickedVertex != null)
                     {
-                        _startVertex = clickedVertex;
-                        _tempLine = new Line
+                        if (_startVertex == null)
                         {
-                            Stroke = Brushes.Black,
-                            StrokeThickness = 2,
-                            X1 = _startVertex.X,
-                            Y1 = _startVertex.Y,
-                            X2 = _startVertex.X,
-                            Y2 = _startVertex.Y
-                        };
-                        GraphCanvas.Children.Add(_tempLine);
-                        _vm.Result = $"Selected start vertex: {_startVertex.Vertex.Label}-{_startVertex.Vertex.Id}";
-                    }
-                    else if (clickedVertex != _startVertex)
-                    {
-                        var endVertex = clickedVertex;
-                        var dialog = new EdgeInputDialog();
-                        if (dialog.ShowDialog() == true)
-                        {
-                            if (int.TryParse(dialog.Weight, out int weight))
-                            {
-                                _vm.Graph.AddEdge(_startVertex.Vertex.Id, endVertex.Vertex.Id, weight);
-                                _vm.Edges.Add(new EdgeViewModel(_startVertex, endVertex, weight));
-                                _vm.Result = $"Edge from {_startVertex.Vertex.Id} to {endVertex.Vertex.Id} with weight {weight} added.";
-                            }
-                            else
-                            {
-                                _vm.Result = "Invalid weight.";
-                            }
+                            _startVertex = clickedVertex;
+                            _startVertex.IsVisited = true;
+                            _vm.Result = $"Selected start vertex: {_startVertex.Vertex.Label}-{_startVertex.Vertex.Id}. Select end vertex.";
                         }
-                        GraphCanvas.Children.Remove(_tempLine);
-                        _startVertex = null;
-                        _tempLine = null;
+                        else if (clickedVertex != _startVertex && _endVertex == null)
+                        {
+                            _endVertex = clickedVertex;
+                            _endVertex.IsVisited = true;
+                            ExecuteAlgorithm();
+                            ResetAlgorithmMode();
+                        }
                     }
                 }
-                else if (_startVertex == null) // Создание новой вершины, только если не выбрана начальная
+                else if (_algorithmMode == "EdgeCreation")
                 {
-                    double gridXRaw = (x - offsetX) / stepSize - halfWidth;
-                    double gridYRaw = (y - offsetY) / stepSize - halfHeight;
-                    int gridX = (int)Math.Round(gridXRaw);
-                    int gridY = (int)Math.Round(gridYRaw);
-
-                    if (gridX >= -halfWidth && gridX <= halfWidth && gridY >= -halfHeight && gridY <= halfHeight)
+                    if (clickedVertex != null)
                     {
-                        var positionKey = (gridX, gridY);
-                        if (_occupiedPositions.Contains(positionKey))
+                        if (_startVertex == null)
                         {
-                            _vm.Result = $"Position ({gridX}, {gridY}) is already occupied.";
-                            return;
+                            _startVertex = clickedVertex;
+                            _tempLine = new Line
+                            {
+                                Stroke = Brushes.Black,
+                                StrokeThickness = 2,
+                                X1 = _startVertex.X,
+                                Y1 = _startVertex.Y,
+                                X2 = _startVertex.X,
+                                Y2 = _startVertex.Y
+                            };
+                            GraphCanvas.Children.Add(_tempLine);
+                            _vm.Result = $"Selected start vertex: {_startVertex.Vertex.Label}-{_startVertex.Vertex.Id}";
                         }
-                        var dialog = new VertexInputDialog();
-                        if (dialog.ShowDialog() == true)
+                        else if (clickedVertex != _startVertex)
                         {
-                            if (int.TryParse(dialog.VertexId, out int id) && !string.IsNullOrEmpty(dialog.VertexLabel))
+                            var endVertex = clickedVertex;
+                            var dialog = new EdgeInputDialog();
+                            if (dialog.ShowDialog() == true)
                             {
-                                if (_vm.Graph.AdjacencyList.ContainsKey(id))
+                                if (int.TryParse(dialog.Weight, out int weight))
                                 {
-                                    _vm.Result = $"Vertex with ID {id} already exists.";
-                                    return;
+                                    // Add forward edge
+                                    _vm.Graph.AddEdge(_startVertex.Vertex.Id, endVertex.Vertex.Id, weight);
+                                    _vm.Edges.Add(new EdgeViewModel(_startVertex, endVertex, weight));
+                                    // Add reverse edge
+                                    _vm.Graph.AddEdge(endVertex.Vertex.Id, _startVertex.Vertex.Id, weight);
+                                    _vm.Edges.Add(new EdgeViewModel(endVertex, _startVertex, weight));
+                                    _vm.Result = $"Edges added between {_startVertex.Vertex.Id} and {endVertex.Vertex.Id} with weight {weight}.";
                                 }
-
-                                _vm.Graph.AddVertex(id, dialog.VertexLabel);
-                                var vertex = new VertexViewModel(new Vertex(id, dialog.VertexLabel))
+                                else
                                 {
-                                    X = offsetX + (gridX + halfWidth) * stepSize,
-                                    Y = offsetY + (gridY + halfHeight) * stepSize
-                                };
-                                _vm.Vertices.Add(vertex);
-                                _occupiedPositions.Add(positionKey);
-                                _vm.Result = $"Vertex {dialog.VertexLabel}-{id} added at ({gridX}, {gridY}).";
+                                    _vm.Result = "Invalid weight.";
+                                }
                             }
-                            else
-                            {
-                                _vm.Result = "Invalid ID or Label.";
-                            }
+                            GraphCanvas.Children.Remove(_tempLine);
+                            _startVertex = null;
+                            _tempLine = null;
                         }
                     }
-                    else
+                    else if (_startVertex == null)
                     {
-                        _vm.Result = $"Click outside grid bounds (±{halfWidth}x±{halfHeight}).";
+                        double gridXRaw = (x - offsetX) / stepSize - halfWidth;
+                        double gridYRaw = (y - offsetY) / stepSize - halfHeight;
+                        int gridX = (int)Math.Round(gridXRaw);
+                        int gridY = (int)Math.Round(gridYRaw);
+
+                        if (gridX >= -halfWidth && gridX <= halfWidth && gridY >= -halfHeight && gridY <= halfHeight)
+                        {
+                            var positionKey = (gridX, gridY);
+                            if (_occupiedPositions.Contains(positionKey))
+                            {
+                                _vm.Result = $"Position ({gridX}, {gridY}) is already occupied.";
+                                return;
+                            }
+                            var dialog = new VertexInputDialog();
+                            if (dialog.ShowDialog() == true)
+                            {
+                                if (int.TryParse(dialog.VertexId, out int id) && !string.IsNullOrEmpty(dialog.VertexLabel))
+                                {
+                                    if (_vm.Graph.AdjacencyList.ContainsKey(id))
+                                    {
+                                        _vm.Result = $"Vertex with ID {id} already exists.";
+                                        return;
+                                    }
+
+                                    _vm.Graph.AddVertex(id, dialog.VertexLabel);
+                                    var vertex = new VertexViewModel(new Vertex(id, dialog.VertexLabel))
+                                    {
+                                        X = offsetX + (gridX + halfWidth) * stepSize,
+                                        Y = offsetY + (gridY + halfHeight) * stepSize
+                                    };
+                                    _vm.Vertices.Add(vertex);
+                                    _occupiedPositions.Add(positionKey);
+                                    _vm.Result = $"Vertex {dialog.VertexLabel}-{id} added at ({gridX}, {gridY}).";
+                                }
+                                else
+                                {
+                                    _vm.Result = "Invalid ID or Label.";
+                                }
+                            }
+                        }
+                        else
+                        {
+                            _vm.Result = $"Click outside grid bounds (±{halfWidth}x±{halfHeight}).";
+                        }
                     }
                 }
             }
@@ -233,7 +268,7 @@ namespace WpfApp.Views
 
         private void GraphCanvas_MouseMove(object sender, MouseEventArgs e)
         {
-            if (_startVertex != null && _tempLine != null)
+            if (_startVertex != null && _tempLine != null && _algorithmMode == "EdgeCreation")
             {
                 var position = e.GetPosition(GraphCanvas);
                 _tempLine.X2 = position.X;
@@ -243,7 +278,121 @@ namespace WpfApp.Views
 
         private void GraphCanvas_MouseLeftButtonUp(object sender, MouseButtonEventArgs e)
         {
-            // Логика убрана, пути создаются через клики
+            // Empty, as vertex creation/selection is handled in MouseLeftButtonDown
+        }
+
+        private void GraphCanvas_MouseRightButtonDown(object sender, MouseButtonEventArgs e)
+        {
+            if (_algorithmMode != "EdgeCreation")
+            {
+                ResetAlgorithmMode();
+                _vm.Result = "Algorithm selection canceled.";
+            }
+        }
+
+        private void ExecuteAlgorithm()
+        {
+            if (_startVertex == null || _endVertex == null) return;
+
+            if (_algorithmMode == "BFS")
+            {
+                var result = BFS.Execute(_vm.Graph, _startVertex.Vertex.Id);
+                _vm.Result = "BFS: " + string.Join(" -> ", result);
+                foreach (var vm in _vm.Vertices)
+                {
+                    vm.IsVisited = result.Contains(vm.Vertex.Id);
+                }
+            }
+            else if (_algorithmMode == "DFS")
+            {
+                var result = DFS.Execute(_vm.Graph, _startVertex.Vertex.Id);
+                _vm.Result = "DFS: " + string.Join(" -> ", result);
+                foreach (var vm in _vm.Vertices)
+                {
+                    vm.IsVisited = result.Contains(vm.Vertex.Id);
+                }
+            }
+            else if (_algorithmMode == "Dijkstra")
+            {
+                var (distances, previous, path) = Dijkstra.Execute(_vm.Graph, _startVertex.Vertex.Id, _endVertex.Vertex.Id);
+                var indexToId = _vm.Graph.Vertices.Select((v, i) => (v.Id, i)).ToDictionary(x => x.i, x => x.Id);
+
+                if (path.Any())
+                {
+                    _vm.Result = $"Dijkstra Path from {_startVertex.Vertex.Id} to {_endVertex.Vertex.Id}: " +
+                                 string.Join(" -> ", path) +
+                                 $", Distance: {distances[_vm.Graph.Vertices.FindIndex(v => v.Id == _endVertex.Vertex.Id)]}";
+                    foreach (var vm in _vm.Vertices)
+                    {
+                        vm.IsVisited = path.Contains(vm.Vertex.Id);
+                    }
+                }
+                else
+                {
+                    _vm.Result = $"No path exists from {_startVertex.Vertex.Id} to {_endVertex.Vertex.Id}";
+                }
+            }
+        }
+
+        private void ResetAlgorithmMode()
+        {
+            _algorithmMode = "EdgeCreation";
+            _startVertex = null;
+            _endVertex = null;
+            foreach (var vm in _vm.Vertices)
+            {
+                vm.IsVisited = false;
+            }
+        }
+
+        public void StartBFS()
+        {
+            if (_vm.Graph.AdjacencyList.Any())
+            {
+                _algorithmMode = "BFS";
+                _vm.Result = "Select start vertex for BFS.";
+                ResetVertexHighlights();
+            }
+            else
+            {
+                _vm.Result = "Graph is empty.";
+            }
+        }
+
+        public void StartDFS()
+        {
+            if (_vm.Graph.AdjacencyList.Any())
+            {
+                _algorithmMode = "DFS";
+                _vm.Result = "Select start vertex for DFS.";
+                ResetVertexHighlights();
+            }
+            else
+            {
+                _vm.Result = "Graph is empty.";
+            }
+        }
+
+        public void StartDijkstra()
+        {
+            if (_vm.Graph.AdjacencyList.Any())
+            {
+                _algorithmMode = "Dijkstra";
+                _vm.Result = "Select start vertex for Dijkstra.";
+                ResetVertexHighlights();
+            }
+            else
+            {
+                _vm.Result = "Graph is empty.";
+            }
+        }
+
+        private void ResetVertexHighlights()
+        {
+            foreach (var vm in _vm.Vertices)
+            {
+                vm.IsVisited = false;
+            }
         }
     }
 }

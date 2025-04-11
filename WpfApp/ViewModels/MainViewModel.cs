@@ -1,14 +1,14 @@
 ﻿using System;
+using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.ComponentModel;
 using System.IO;
 using System.Linq;
 using System.Runtime.CompilerServices;
+using System.Windows;
 using System.Windows.Input;
 using GraphLibrary.Models;
-using GraphLibrary.Algorithms;
 using Newtonsoft.Json;
-using System.Collections.Generic;
 using WpfApp.Views;
 
 namespace WpfApp.ViewModels
@@ -56,9 +56,9 @@ namespace WpfApp.ViewModels
         public MainViewModel()
         {
             _graph = new Graph();
-            RunBFSCommand = new RelayCommand(RunBFS);
-            RunDFSCommand = new RelayCommand(RunDFS);
-            RunDijkstraCommand = new RelayCommand(RunDijkstra);
+            RunBFSCommand = new RelayCommand(StartBFS);
+            RunDFSCommand = new RelayCommand(StartDFS);
+            RunDijkstraCommand = new RelayCommand(StartDijkstra);
             SaveCommand = new RelayCommand(SaveGraph);
             LoadCommand = new RelayCommand(LoadGraph);
             DeleteCommand = new RelayCommand(DeleteGraph);
@@ -68,16 +68,13 @@ namespace WpfApp.ViewModels
             GridStep = 1;
         }
 
-        private void RunBFS(object parameter)
+        private void StartBFS(object parameter)
         {
             if (_graph.AdjacencyList.Any())
             {
-                var startId = _graph.AdjacencyList.Keys.First();
-                var result = BFS.Execute(_graph, startId);
-                Result = "BFS: " + string.Join(" -> ", result);
-                foreach (var vm in Vertices)
+                if (Application.Current.MainWindow is MainWindow mainWindow)
                 {
-                    vm.IsVisited = result.Contains(vm.Vertex.Id);
+                    mainWindow.StartBFS();
                 }
             }
             else
@@ -86,16 +83,13 @@ namespace WpfApp.ViewModels
             }
         }
 
-        private void RunDFS(object parameter)
+        private void StartDFS(object parameter)
         {
             if (_graph.AdjacencyList.Any())
             {
-                var startId = _graph.AdjacencyList.Keys.First();
-                var result = DFS.Execute(_graph, startId);
-                Result = "DFS: " + string.Join(" -> ", result);
-                foreach (var vm in Vertices)
+                if (Application.Current.MainWindow is MainWindow mainWindow)
                 {
-                    vm.IsVisited = result.Contains(vm.Vertex.Id);
+                    mainWindow.StartDFS();
                 }
             }
             else
@@ -104,31 +98,13 @@ namespace WpfApp.ViewModels
             }
         }
 
-        private void RunDijkstra(object parameter)
+        private void StartDijkstra(object parameter)
         {
             if (_graph.AdjacencyList.Any())
             {
-                var dialog = new DijkstraInputDialog(this);
-                if (dialog.ShowDialog() == true && dialog.StartVertexId.HasValue && dialog.EndVertexId.HasValue)
+                if (Application.Current.MainWindow is MainWindow mainWindow)
                 {
-                    var (distances, previous, path) = Dijkstra.Execute(_graph, dialog.StartVertexId.Value, dialog.EndVertexId.Value);
-                    var indexToId = _graph.Vertices.Select((v, i) => (v.Id, i)).ToDictionary(x => x.i, x => x.Id);
-
-                    if (path.Any())
-                    {
-                        Result = $"Dijkstra Path from {dialog.StartVertexId} to {dialog.EndVertexId}: " +
-                                 string.Join(" -> ", path) +
-                                 $", Distance: {distances[_graph.Vertices.FindIndex(v => v.Id == dialog.EndVertexId.Value)]}";
-
-                        foreach (var vm in Vertices)
-                        {
-                            vm.IsVisited = path.Contains(vm.Vertex.Id);
-                        }
-                    }
-                    else
-                    {
-                        Result = $"No path exists from {dialog.StartVertexId} to {dialog.EndVertexId}";
-                    }
+                    mainWindow.StartDijkstra();
                 }
             }
             else

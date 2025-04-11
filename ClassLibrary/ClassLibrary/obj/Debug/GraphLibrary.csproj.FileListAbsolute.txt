@@ -16,3 +16,12 @@ C:\Users\Toxic\Desktop\Программная инженерия 20\ClassLibrary
 C:\Users\Toxic\Desktop\Программная инженерия 20\ClassLibrary\ClassLibrary\obj\Debug\GraphLib.AEDA1A1B.Up2Date
 C:\Users\Toxic\Desktop\Программная инженерия 20\ClassLibrary\ClassLibrary\obj\Debug\ClassLibrary.dll
 C:\Users\Toxic\Desktop\Программная инженерия 20\ClassLibrary\ClassLibrary\obj\Debug\ClassLibrary.pdb
+C:\Users\Toxic\Desktop\Not main\ClassLibrary\ClassLibrary\bin\Debug\ClassLibrary.dll
+C:\Users\Toxic\Desktop\Not main\ClassLibrary\ClassLibrary\bin\Debug\ClassLibrary.pdb
+C:\Users\Toxic\Desktop\Not main\ClassLibrary\ClassLibrary\bin\Debug\Newtonsoft.Json.dll
+C:\Users\Toxic\Desktop\Not main\ClassLibrary\ClassLibrary\bin\Debug\Newtonsoft.Json.xml
+C:\Users\Toxic\Desktop\Not main\ClassLibrary\ClassLibrary\obj\Debug\GraphLibrary.csproj.AssemblyReference.cache
+C:\Users\Toxic\Desktop\Not main\ClassLibrary\ClassLibrary\obj\Debug\GraphLibrary.csproj.CoreCompileInputs.cache
+C:\Users\Toxic\Desktop\Not main\ClassLibrary\ClassLibrary\obj\Debug\GraphLib.AEDA1A1B.Up2Date
+C:\Users\Toxic\Desktop\Not main\ClassLibrary\ClassLibrary\obj\Debug\ClassLibrary.dll
+C:\Users\Toxic\Desktop\Not main\ClassLibrary\ClassLibrary\obj\Debug\ClassLibrary.pdb
