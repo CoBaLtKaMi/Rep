@@ -19,8 +19,9 @@ namespace WpfApp.Views
         private VertexViewModel _endVertex;
         private Line _tempLine;
         private HashSet<(int, int)> _occupiedPositions;
-        private const double VertexSize = 35; // Matches XAML hit-test area
-        private string _algorithmMode; // EdgeCreation, BFS, DFS, Dijkstra
+        private const double VertexSize = 35;
+        private string _algorithmMode;
+        private int _nextVertexId;
 
         public MainWindow()
         {
@@ -37,6 +38,8 @@ namespace WpfApp.Views
                     GenerateGrid();
             };
             _algorithmMode = "EdgeCreation";
+            _nextVertexId = 1;
+            Console.WriteLine($"[DEBUG] DataContext set: {DataContext != null}");
         }
 
         private void MainWindow_Loaded(object sender, RoutedEventArgs e)
@@ -118,8 +121,13 @@ namespace WpfApp.Views
                 Stroke = Brushes.Black,
                 StrokeThickness = 3
             };
-            Canvas.SetZIndex(yAxis, 0);
+            Canvas.SetZIndex(yAxis, -1);
             GraphCanvas.Children.Add(yAxis);
+
+            foreach (var vertex in _vm.Vertices)
+            {
+                vertex.UpdateCanvasPosition(stepSize, offsetX, offsetY, halfWidth, halfHeight);
+            }
         }
 
         private void GraphCanvas_MouseLeftButtonDown(object sender, MouseButtonEventArgs e)
@@ -197,10 +205,8 @@ namespace WpfApp.Views
                             {
                                 if (int.TryParse(dialog.Weight, out int weight))
                                 {
-                                    // Add forward edge
                                     _vm.Graph.AddEdge(_startVertex.Vertex.Id, endVertex.Vertex.Id, weight);
                                     _vm.Edges.Add(new EdgeViewModel(_startVertex, endVertex, weight));
-                                    // Add reverse edge
                                     _vm.Graph.AddEdge(endVertex.Vertex.Id, _startVertex.Vertex.Id, weight);
                                     _vm.Edges.Add(new EdgeViewModel(endVertex, _startVertex, weight));
                                     _vm.Result = $"Edges added between {_startVertex.Vertex.Id} and {endVertex.Vertex.Id} with weight {weight}.";
@@ -233,27 +239,23 @@ namespace WpfApp.Views
                             var dialog = new VertexInputDialog();
                             if (dialog.ShowDialog() == true)
                             {
-                                if (int.TryParse(dialog.VertexId, out int id) && !string.IsNullOrEmpty(dialog.VertexLabel))
+                                if (!string.IsNullOrEmpty(dialog.VertexLabel))
                                 {
-                                    if (_vm.Graph.AdjacencyList.ContainsKey(id))
-                                    {
-                                        _vm.Result = $"Vertex with ID {id} already exists.";
-                                        return;
-                                    }
-
+                                    int id = _nextVertexId++;
                                     _vm.Graph.AddVertex(id, dialog.VertexLabel);
                                     var vertex = new VertexViewModel(new Vertex(id, dialog.VertexLabel))
                                     {
-                                        X = offsetX + (gridX + halfWidth) * stepSize,
-                                        Y = offsetY + (gridY + halfHeight) * stepSize
+                                        GridX = gridX,
+                                        GridY = gridY
                                     };
+                                    vertex.UpdateCanvasPosition(stepSize, offsetX, offsetY, halfWidth, halfHeight);
                                     _vm.Vertices.Add(vertex);
                                     _occupiedPositions.Add(positionKey);
                                     _vm.Result = $"Vertex {dialog.VertexLabel}-{id} added at ({gridX}, {gridY}).";
                                 }
                                 else
                                 {
-                                    _vm.Result = "Invalid ID or Label.";
+                                    _vm.Result = "Invalid Label.";
                                 }
                             }
                         }
@@ -278,7 +280,6 @@ namespace WpfApp.Views
 
         private void GraphCanvas_MouseLeftButtonUp(object sender, MouseButtonEventArgs e)
         {
-            // Empty, as vertex creation/selection is handled in MouseLeftButtonDown
         }
 
         private void GraphCanvas_MouseRightButtonDown(object sender, MouseButtonEventArgs e)
@@ -294,34 +295,55 @@ namespace WpfApp.Views
         {
             if (_startVertex == null || _endVertex == null) return;
 
+            _vm.ResetAlgorithmSteps();
+            Console.WriteLine($"[DEBUG] Executing algorithm: {_algorithmMode}");
+
             if (_algorithmMode == "BFS")
             {
-                var result = BFS.Execute(_vm.Graph, _startVertex.Vertex.Id);
-                _vm.Result = "BFS: " + string.Join(" -> ", result);
+                var (result, steps) = BFS.ExecuteWithSteps(_vm.Graph, _startVertex.Vertex.Id);
+                Console.WriteLine($"[DEBUG] BFS returned {steps.Count} steps");
+                foreach (var (visited, desc) in steps)
+                {
+                    _vm.StoreAlgorithmStep(visited, desc);
+                }
+                _vm.Result = $"BFS: {string.Join(" -> ", result)}. Steps saved: {steps.Count}";
+                _vm.StorePath(result);
                 foreach (var vm in _vm.Vertices)
                 {
                     vm.IsVisited = result.Contains(vm.Vertex.Id);
                 }
+                _vm.CanStepAlgorithm = true;
             }
             else if (_algorithmMode == "DFS")
             {
-                var result = DFS.Execute(_vm.Graph, _startVertex.Vertex.Id);
-                _vm.Result = "DFS: " + string.Join(" -> ", result);
+                var (result, steps) = DFS.ExecuteWithSteps(_vm.Graph, _startVertex.Vertex.Id);
+                Console.WriteLine($"[DEBUG] DFS returned {steps.Count} steps");
+                foreach (var (visited, desc) in steps)
+                {
+                    _vm.StoreAlgorithmStep(visited, desc);
+                }
+                _vm.Result = $"DFS: {string.Join(" -> ", result)}. Steps saved: {steps.Count}";
+                _vm.StorePath(result);
                 foreach (var vm in _vm.Vertices)
                 {
                     vm.IsVisited = result.Contains(vm.Vertex.Id);
                 }
+                _vm.CanStepAlgorithm = true;
             }
             else if (_algorithmMode == "Dijkstra")
             {
-                var (distances, previous, path) = Dijkstra.Execute(_vm.Graph, _startVertex.Vertex.Id, _endVertex.Vertex.Id);
+                var (distances, previous, path, steps) = Dijkstra.ExecuteWithSteps(_vm.Graph, _startVertex.Vertex.Id, _endVertex.Vertex.Id);
+                Console.WriteLine($"[DEBUG] Dijkstra returned {steps.Count} steps");
+                foreach (var (visited, desc) in steps)
+                {
+                    _vm.StoreAlgorithmStep(visited, desc);
+                }
                 var indexToId = _vm.Graph.Vertices.Select((v, i) => (v.Id, i)).ToDictionary(x => x.i, x => x.Id);
 
                 if (path.Any())
                 {
-                    _vm.Result = $"Dijkstra Path from {_startVertex.Vertex.Id} to {_endVertex.Vertex.Id}: " +
-                                 string.Join(" -> ", path) +
-                                 $", Distance: {distances[_vm.Graph.Vertices.FindIndex(v => v.Id == _endVertex.Vertex.Id)]}";
+                    _vm.Result = $"Dijkstra Path from {_startVertex.Vertex.Id} to {_endVertex.Vertex.Id}: {string.Join(" -> ", path)}, Distance: {distances[_vm.Graph.Vertices.FindIndex(v => v.Id == _endVertex.Vertex.Id)]}. Steps saved: {steps.Count}. CanStepAlgorithm: {_vm.CanStepAlgorithm}";
+                    _vm.StorePath(path);
                     foreach (var vm in _vm.Vertices)
                     {
                         vm.IsVisited = path.Contains(vm.Vertex.Id);
@@ -329,13 +351,18 @@ namespace WpfApp.Views
                 }
                 else
                 {
-                    _vm.Result = $"No path exists from {_startVertex.Vertex.Id} to {_endVertex.Vertex.Id}";
+                    _vm.Result = $"No path exists from {_startVertex.Vertex.Id} to {_endVertex.Vertex.Id}. Steps saved: {steps.Count}. CanStepAlgorithm: {_vm.CanStepAlgorithm}";
+                    _vm.StorePath(new List<int>());
+                    _vm.StoreAlgorithmStep(new List<int> { _startVertex.Vertex.Id }, "No path found, start vertex visited");
                 }
+                _vm.CanStepAlgorithm = true;
             }
+            Console.WriteLine($"[DEBUG] ExecuteAlgorithm completed, CanStepAlgorithm: {_vm.CanStepAlgorithm}");
         }
 
         private void ResetAlgorithmMode()
         {
+            Console.WriteLine($"[DEBUG] Resetting algorithm mode from {_algorithmMode}");
             _algorithmMode = "EdgeCreation";
             _startVertex = null;
             _endVertex = null;

@@ -1,24 +1,59 @@
-﻿using System;
-using System.Globalization;
-using System.Windows.Data;
+﻿using System.ComponentModel;
+using System.Runtime.CompilerServices;
 using GraphLibrary.Models;
 
-namespace WpfApp.Converters
+namespace WpfApp.ViewModels
 {
-    public class VertexConverter : IValueConverter
+    public class VertexViewModel : INotifyPropertyChanged
     {
-        public object Convert(object value, Type targetType, object parameter, CultureInfo culture)
+        private int _gridX;
+        private int _gridY;
+        private double _x;
+        private double _y;
+        private bool _isVisited;
+
+        public Vertex Vertex { get; }
+        public int GridX
         {
-            if (value is Vertex vertex)
-            {
-                return $"{vertex.Label}-{vertex.Id}";
-            }
-            return string.Empty;
+            get => _gridX;
+            set { _gridX = value; OnPropertyChanged(); }
+        }
+        public int GridY
+        {
+            get => _gridY;
+            set { _gridY = value; OnPropertyChanged(); }
+        }
+        public double X
+        {
+            get => _x;
+            set { _x = value; OnPropertyChanged(); }
+        }
+        public double Y
+        {
+            get => _y;
+            set { _y = value; OnPropertyChanged(); }
+        }
+        public bool IsVisited
+        {
+            get => _isVisited;
+            set { _isVisited = value; OnPropertyChanged(); }
         }
 
-        public object ConvertBack(object value, Type targetType, object parameter, CultureInfo culture)
+        public VertexViewModel(Vertex vertex)
         {
-            throw new NotImplementedException();
+            Vertex = vertex;
+        }
+
+        public void UpdateCanvasPosition(double stepSize, double offsetX, double offsetY, int halfWidth, int halfHeight)
+        {
+            X = offsetX + (_gridX + halfWidth) * stepSize;
+            Y = offsetY + (_gridY + halfHeight) * stepSize;
+        }
+
+        public event PropertyChangedEventHandler PropertyChanged;
+        protected void OnPropertyChanged([CallerMemberName] string propertyName = null)
+        {
+            PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(propertyName));
         }
     }
 }

@@ -61,7 +61,7 @@
     <Compile Include="ViewModels\EdgeViewModel.cs" />
     <Compile Include="ViewModels\MainViewModel.cs" />
     <Compile Include="ViewModels\RelayCommand.cs" />
-    <Compile Include="ViewModels\VertexConverters.cs" />
+    <Compile Include="ViewModels\VertexConverter.cs" />
     <Compile Include="VertexInputDialog.xaml.cs">
       <DependentUpon>VertexInputDialog.xaml</DependentUpon>
     </Compile>

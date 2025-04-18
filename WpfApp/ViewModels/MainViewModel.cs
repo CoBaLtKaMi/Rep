@@ -20,6 +20,10 @@ namespace WpfApp.ViewModels
         private int _gridWidth;
         private int _gridHeight;
         private int _gridStep;
+        private List<(List<int> visited, string description)> _algorithmSteps;
+        private int _currentStepIndex;
+        private List<int> _lastPath;
+        private bool _canStepAlgorithm;
 
         public ObservableCollection<VertexViewModel> Vertices { get; } = new ObservableCollection<VertexViewModel>();
         public ObservableCollection<EdgeViewModel> Edges { get; } = new ObservableCollection<EdgeViewModel>();
@@ -45,6 +49,16 @@ namespace WpfApp.ViewModels
             get => _gridStep;
             set { _gridStep = value; OnPropertyChanged(); UpdateVertexPositions(); }
         }
+        public bool CanStepAlgorithm
+        {
+            get => _canStepAlgorithm;
+            set
+            {
+                _canStepAlgorithm = value;
+                Console.WriteLine($"[DEBUG] CanStepAlgorithm set to: {_canStepAlgorithm}, Caller: {new System.Diagnostics.StackTrace().GetFrame(1).GetMethod().Name}");
+                OnPropertyChanged();
+            }
+        }
 
         public ICommand RunBFSCommand { get; }
         public ICommand RunDFSCommand { get; }
@@ -52,6 +66,9 @@ namespace WpfApp.ViewModels
         public ICommand SaveCommand { get; }
         public ICommand LoadCommand { get; }
         public ICommand DeleteCommand { get; }
+        public ICommand StepAlgorithmCommand { get; }
+        public ICommand HighlightPathCommand { get; }
+        public ICommand ForceEnableStepCommand { get; }
 
         public MainViewModel()
         {
@@ -62,10 +79,17 @@ namespace WpfApp.ViewModels
             SaveCommand = new RelayCommand(SaveGraph);
             LoadCommand = new RelayCommand(LoadGraph);
             DeleteCommand = new RelayCommand(DeleteGraph);
+            StepAlgorithmCommand = new RelayCommand(StepAlgorithm, _ => CanStepAlgorithm);
+            HighlightPathCommand = new RelayCommand(HighlightPath);
+            ForceEnableStepCommand = new RelayCommand(ForceEnableStep);
             LoadGraph(null);
             GridWidth = 10;
             GridHeight = 10;
             GridStep = 1;
+            _algorithmSteps = new List<(List<int> visited, string description)>();
+            _currentStepIndex = -1;
+            _lastPath = new List<int>();
+            _canStepAlgorithm = false;
         }
 
         private void StartBFS(object parameter)
@@ -113,11 +137,45 @@ namespace WpfApp.ViewModels
             }
         }
 
+        private void StepAlgorithm(object parameter)
+        {
+            if (_algorithmSteps.Any() && _currentStepIndex < _algorithmSteps.Count - 1)
+            {
+                _currentStepIndex++;
+                var (visited, description) = _algorithmSteps[_currentStepIndex];
+                UpdateVertexHighlights(visited);
+                Result = $"Step {_currentStepIndex + 1}/{_algorithmSteps.Count}: {description}";
+            }
+            else
+            {
+                Result = $"No more steps to display. Total steps: {_algorithmSteps.Count}";
+            }
+        }
+
+        private void HighlightPath(object parameter)
+        {
+            if (_lastPath.Any())
+            {
+                UpdateVertexHighlights(_lastPath);
+                Result = "Path highlighted: " + string.Join(" -> ", _lastPath);
+            }
+            else
+            {
+                Result = "No path available to highlight.";
+            }
+        }
+
+        private void ForceEnableStep(object parameter)
+        {
+            CanStepAlgorithm = true;
+            Result = "Step Algorithm button forcibly enabled for testing.";
+        }
+
         private void SaveGraph(object parameter)
         {
             var data = new GraphData
             {
-                Vertices = Vertices.Select(v => new VertexData { Id = v.Vertex.Id, Label = v.Vertex.Label, X = v.X / (GridStep * 30), Y = -v.Y / (GridStep * 30) }).ToList(),
+                Vertices = Vertices.Select(v => new VertexData { Id = v.Vertex.Id, Label = v.Vertex.Label, GridX = v.GridX, GridY = v.GridY }).ToList(),
                 Edges = Edges.Select(e => new EdgeData { From = e.From.Vertex.Id, To = e.To.Vertex.Id, Weight = e.Weight }).ToList(),
                 GridWidth = GridWidth,
                 GridHeight = GridHeight,
@@ -143,7 +201,7 @@ namespace WpfApp.ViewModels
                 foreach (var v in data.Vertices)
                 {
                     _graph.AddVertex(v.Id, v.Label);
-                    Vertices.Add(new VertexViewModel(new Vertex(v.Id, v.Label)) { X = v.X * GridStep * 30, Y = -v.Y * GridStep * 30 });
+                    Vertices.Add(new VertexViewModel(new Vertex(v.Id, v.Label)) { GridX = v.GridX, GridY = v.GridY });
                 }
 
                 foreach (var e in data.Edges)
@@ -154,6 +212,7 @@ namespace WpfApp.ViewModels
                     Edges.Add(new EdgeViewModel(from, to, e.Weight));
                 }
                 Result = "Graph loaded.";
+                UpdateVertexPositions();
             }
         }
 
@@ -175,15 +234,62 @@ namespace WpfApp.ViewModels
 
         private void UpdateVertexPositions()
         {
-            if (GridWidth > 0 && GridHeight > 0 && GridStep > 0)
+            if (GridWidth > 0 && GridHeight > 0 && GridStep > 0 && Application.Current.MainWindow is MainWindow mainWindow)
             {
+                double stepSize = GridStep * 30;
+                int halfWidth = GridWidth / 2;
+                int halfHeight = GridHeight / 2;
+                double canvasWidth = mainWindow.GraphCanvas.ActualWidth;
+                double canvasHeight = mainWindow.GraphCanvas.ActualHeight;
+                double gridTotalWidth = GridWidth * stepSize;
+                double gridTotalHeight = GridHeight * stepSize;
+                double offsetX = (canvasWidth - gridTotalWidth) / 2;
+                double offsetY = (canvasHeight - gridTotalHeight) / 2;
+
                 foreach (var vertex in Vertices)
                 {
-                    int x = (int)(vertex.X / (vertex.X == 0 ? 1 : GridStep * 30));
-                    int y = (int)(-vertex.Y / (vertex.Y == 0 ? 1 : GridStep * 30));
-                    vertex.X = x * GridStep * 30;
-                    vertex.Y = -y * GridStep * 30;
+                    vertex.UpdateCanvasPosition(stepSize, offsetX, offsetY, halfWidth, halfHeight);
                 }
+            }
+        }
+
+        public void StoreAlgorithmStep(List<int> visited, string description)
+        {
+            _algorithmSteps.Add((visited, description));
+            Console.WriteLine($"[DEBUG] Stored step: {description}, Visited: {string.Join(", ", visited)}");
+            CanStepAlgorithm = true;
+            OnPropertyChanged(nameof(CanStepAlgorithm));
+        }
+
+        public void ResetAlgorithmSteps()
+        {
+            _algorithmSteps.Clear();
+            _currentStepIndex = -1;
+            CanStepAlgorithm = false;
+            Console.WriteLine("[DEBUG] Algorithm steps reset.");
+        }
+
+        public void StorePath(List<int> path)
+        {
+            _lastPath = path;
+            CanStepAlgorithm = _algorithmSteps.Any();
+            Console.WriteLine($"[DEBUG] Path stored: {string.Join(" -> ", path)}. Total steps: {_algorithmSteps.Count}. CanStepAlgorithm: {CanStepAlgorithm}");
+            OnPropertyChanged(nameof(CanStepAlgorithm));
+            if (_algorithmSteps.Any())
+            {
+                Result = $"Algorithm completed. Total steps: {_algorithmSteps.Count}. Use 'Step Algorithm' to view.";
+            }
+            else
+            {
+                Result = "Algorithm completed, but no steps were saved.";
+            }
+        }
+
+        private void UpdateVertexHighlights(List<int> vertices)
+        {
+            foreach (var vm in Vertices)
+            {
+                vm.IsVisited = vertices.Contains(vm.Vertex.Id);
             }
         }
 
@@ -207,8 +313,8 @@ namespace WpfApp.ViewModels
     {
         public int Id { get; set; }
         public string Label { get; set; }
-        public double X { get; set; }
-        public double Y { get; set; }
+        public int GridX { get; set; }
+        public int GridY { get; set; }
     }
 
     public class EdgeData
