@@ -1,0 +1,6 @@
+C:\Users\FARAON511\Desktop\Программная инженерия 20\ProjectSolution\obj\Debug\ProjectSolution.csproj.AssemblyReference.cache
+C:\Users\FARAON511\Desktop\Программная инженерия 20\ProjectSolution\obj\Debug\ProjectSolution.csproj.CoreCompileInputs.cache
+C:\Users\Toxic\Desktop\Программная инженерия 20\ProjectSolution\obj\Debug\ProjectSolution.csproj.AssemblyReference.cache
+C:\Users\Toxic\Desktop\Программная инженерия 20\ProjectSolution\obj\Debug\ProjectSolution.csproj.CoreCompileInputs.cache
+C:\Users\Toxic\Desktop\Not main\ProjectSolution\obj\Debug\ProjectSolution.csproj.AssemblyReference.cache
+C:\Users\Toxic\Desktop\Not main\ProjectSolution\obj\Debug\ProjectSolution.csproj.CoreCompileInputs.cache
