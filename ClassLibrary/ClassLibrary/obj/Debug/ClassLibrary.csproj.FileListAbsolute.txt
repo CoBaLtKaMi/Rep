@@ -1,2 +1,0 @@
-C:\Users\FARAON511\Desktop\Программная инженерия 20\ClassLibrary\ClassLibrary\obj\Debug\ClassLibrary.csproj.AssemblyReference.cache
-C:\Users\FARAON511\Desktop\Программная инженерия 20\ClassLibrary\ClassLibrary\obj\Debug\ClassLibrary.csproj.CoreCompileInputs.cache
