@@ -54,12 +54,21 @@ namespace GraphLibrary.Algorithms
 
         public static (int[] distances, int[] previous, List<int> path) Execute(Graph graph, int startVertex, int? endVertex = null)
         {
+            var (distances, previous, path, _) = ExecuteWithSteps(graph, startVertex, endVertex);
+            return (distances, previous, path);
+        }
+
+        public static (int[] distances, int[] previous, List<int> path, List<(List<int> visited, string description)> steps) ExecuteWithSteps(Graph graph, int startVertex, int? endVertex = null)
+        {
             var vertexIds = graph.Vertices.Select(v => v.Id).ToList();
             int n = graph.Vertices.Count;
             int[] distances = new int[n];
             int[] previous = new int[n];
             var heap = new MinHeap();
             List<int> path = new List<int>();
+            var steps = new List<(List<int> visited, string description)>();
+            var visited = new HashSet<int>();
+            var visitedList = new List<int>(); // To maintain order for steps
 
             for (int i = 0; i < n; i++)
             {
@@ -80,18 +89,25 @@ namespace GraphLibrary.Algorithms
 
                 if (currentDistance > distances[currentIndex]) continue;
 
-                foreach (var neighbor in graph.AdjacencyList[currentVertex])
+                if (!visited.Contains(currentVertex))
                 {
-                    int neighborVertex = neighbor.vertex;
-                    int weight = neighbor.weight;
-                    int neighborIndex = vertexIds.IndexOf(neighborVertex);
-                    int newDist = distances[currentIndex] + weight;
+                    visited.Add(currentVertex);
+                    visitedList.Add(currentVertex);
+                    steps.Add((new List<int>(visitedList), $"Visited vertex {currentVertex}"));
 
-                    if (newDist < distances[neighborIndex])
+                    foreach (var neighbor in graph.AdjacencyList[currentVertex])
                     {
-                        distances[neighborIndex] = newDist;
-                        previous[neighborIndex] = currentIndex;
-                        heap.Enqueue((neighborVertex, newDist));
+                        int neighborVertex = neighbor.vertex;
+                        int weight = neighbor.weight;
+                        int neighborIndex = vertexIds.IndexOf(neighborVertex);
+                        int newDist = distances[currentIndex] + weight;
+
+                        if (newDist < distances[neighborIndex])
+                        {
+                            distances[neighborIndex] = newDist;
+                            previous[neighborIndex] = currentIndex;
+                            heap.Enqueue((neighborVertex, newDist));
+                        }
                     }
                 }
             }
@@ -111,7 +127,7 @@ namespace GraphLibrary.Algorithms
                 }
             }
 
-            return (distances, previous, path);
+            return (distances, previous, path, steps);
         }
     }
 }

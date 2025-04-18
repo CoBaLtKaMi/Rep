@@ -3,16 +3,20 @@ using GraphLibrary.Models;
 
 namespace GraphLibrary.Algorithms
 {
-    /// <summary>
-    /// Реализация нерекурсивного алгоритма поиска в глубину (DFS)
-    /// </summary>
     public static class DFS
     {
         public static List<int> Execute(Graph graph, int startVertex)
         {
+            var (result, _) = ExecuteWithSteps(graph, startVertex);
+            return result;
+        }
+
+        public static (List<int> result, List<(List<int> visited, string description)> steps) ExecuteWithSteps(Graph graph, int startVertex)
+        {
             var visited = new HashSet<int>();
             var stack = new Stack<int>();
             var result = new List<int>();
+            var steps = new List<(List<int> visited, string description)>();
 
             stack.Push(startVertex);
 
@@ -24,6 +28,7 @@ namespace GraphLibrary.Algorithms
                 {
                     visited.Add(current);
                     result.Add(current);
+                    steps.Add((new List<int>(result), $"Visited vertex {current}"));
 
                     var neighbors = graph.AdjacencyList[current];
                     for (int i = neighbors.Count - 1; i >= 0; i--)
@@ -34,7 +39,7 @@ namespace GraphLibrary.Algorithms
                 }
             }
 
-            return result;
+            return (result, steps);
         }
     }
 }

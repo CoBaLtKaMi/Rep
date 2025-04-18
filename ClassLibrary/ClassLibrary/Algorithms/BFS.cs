@@ -3,16 +3,20 @@ using GraphLibrary.Models;
 
 namespace GraphLibrary.Algorithms
 {
-    /// <summary>
-    /// Реализация нерекурсивного алгоритма поиска в ширину (BFS)
-    /// </summary>
     public static class BFS
     {
         public static List<int> Execute(Graph graph, int startVertex)
         {
+            var (result, _) = ExecuteWithSteps(graph, startVertex);
+            return result;
+        }
+
+        public static (List<int> result, List<(List<int> visited, string description)> steps) ExecuteWithSteps(Graph graph, int startVertex)
+        {
             var visited = new HashSet<int>();
             var queue = new Queue<int>();
             var result = new List<int>();
+            var steps = new List<(List<int> visited, string description)>();
 
             queue.Enqueue(startVertex);
 
@@ -24,6 +28,7 @@ namespace GraphLibrary.Algorithms
                 {
                     visited.Add(current);
                     result.Add(current);
+                    steps.Add((new List<int>(result), $"Visited vertex {current}"));
 
                     foreach (var (vertex, weight) in graph.AdjacencyList[current])
                     {
@@ -33,7 +38,7 @@ namespace GraphLibrary.Algorithms
                 }
             }
 
-            return result;
+            return (result, steps);
         }
     }
 }
